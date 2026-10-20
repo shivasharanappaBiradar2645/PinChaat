@@ -11,14 +11,20 @@ export async function GET(request: NextRequest) {
   const supabase = getServiceRoleClient();
   const { data: places, error } = await supabase
     .from('places')
-    .select('*, reviews(count)')
+    .select('*, reviews(id, author_name, rating, content, must_try_dishes, price_paid, status, created_at)')
     .order('created_at', { ascending: false });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ places });
+  // Filter out pending/rejected reviews from the public response so only approved reviews are shown
+  const sanitizedPlaces = (places || []).map((p) => ({
+    ...p,
+    reviews: (p.reviews || []).filter((r: { status: string }) => r.status === 'approved'),
+  }));
+
+  return NextResponse.json({ places: sanitizedPlaces });
 }
 
 export async function POST(request: NextRequest) {

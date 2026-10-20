@@ -27,6 +27,7 @@ export default function ReviewModal({ place, isOpen, onClose }: ReviewModalProps
   const [mustTryDishes, setMustTryDishes] = useState('');
   const [pricePaid, setPricePaid] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmittedSuccessfully, setIsSubmittedSuccessfully] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   if (!place) return null;
@@ -58,20 +59,10 @@ export default function ReviewModal({ place, isOpen, onClose }: ReviewModalProps
         throw new Error(data.error || 'Failed to submit review');
       }
 
-      setStatusMessage({
-        type: 'success',
-        text: 'Review submitted anonymously! It will appear once approved by the admin.',
-      });
-
-      // Clear form
+      setIsSubmittedSuccessfully(true);
       setContent('');
       setMustTryDishes('');
       setPricePaid('');
-
-      setTimeout(() => {
-        onClose();
-        setStatusMessage(null);
-      }, 2000);
     } catch (err: unknown) {
       setStatusMessage({
         type: 'error',
@@ -82,10 +73,50 @@ export default function ReviewModal({ place, isOpen, onClose }: ReviewModalProps
     }
   };
 
+  const handleClose = () => {
+    setIsSubmittedSuccessfully(false);
+    setStatusMessage(null);
+    onClose();
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent className="sm:max-w-[480px]">
-        <DialogHeader>
+        {isSubmittedSuccessfully ? (
+          <div className="flex flex-col items-center justify-center p-4 py-8 text-center gap-4">
+            <div className="size-14 rounded-full bg-green-100 dark:bg-green-950 flex items-center justify-center text-green-600">
+              <CheckCircle className="size-8" />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <h3 className="font-extrabold text-lg text-foreground">Review Submitted!</h3>
+              <p className="text-xs text-muted-foreground">
+                Your foodie notes for <strong>{place.name}</strong> are on their way.
+              </p>
+            </div>
+
+            <div className="p-3.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2.5 text-left max-w-md">
+              <div className="flex flex-col gap-1">
+                <span className="font-semibold text-xs text-amber-900 dark:text-amber-100">
+                  ⏳ Awaiting Admin Approval
+                </span>
+                <span className="text-[11px] leading-relaxed text-amber-800 dark:text-amber-300">
+                  To ensure quality, all reviews are held in the admin moderation queue. Once approved, your review will appear publicly on this spot and be vectorized into our AI cravings search!
+                </span>
+              </div>
+            </div>
+
+            <Button
+              type="button"
+              onClick={handleClose}
+              className="mt-2 text-xs bg-orange-600 hover:bg-orange-700 text-white px-6"
+            >
+              Got it, thanks!
+            </Button>
+          </div>
+        ) : (
+          <>
+            <DialogHeader>
           <DialogTitle className="text-lg">Review {place.name}</DialogTitle>
           <DialogDescription className="text-xs">
             Share what you ate and if it was worth the hype. No login required.
@@ -186,7 +217,7 @@ export default function ReviewModal({ place, isOpen, onClose }: ReviewModalProps
           </div>
 
           <div className="flex justify-end gap-2 mt-2 pt-2 border-t">
-            <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={isSubmitting}>
+            <Button type="button" variant="outline" size="sm" onClick={handleClose} disabled={isSubmitting}>
               Cancel
             </Button>
             <Button
@@ -199,6 +230,8 @@ export default function ReviewModal({ place, isOpen, onClose }: ReviewModalProps
             </Button>
           </div>
         </form>
+        </>
+        )}
       </DialogContent>
     </Dialog>
   );

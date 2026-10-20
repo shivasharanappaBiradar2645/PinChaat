@@ -57,10 +57,10 @@ export async function GET(request: NextRequest) {
       // Collect place IDs from matched reviews
       const placeIds = Array.from(new Set(matchedReviews.map((r: { place_id: string }) => r.place_id)));
 
-      // Fetch the places
+      // Fetch the places with approved reviews
       const { data: places, error: placesError } = await supabase
         .from('places')
-        .select('*')
+        .select('*, reviews(id, author_name, rating, content, must_try_dishes, price_paid, status, created_at)')
         .in('id', placeIds);
 
       if (placesError) {
@@ -73,6 +73,7 @@ export async function GET(request: NextRequest) {
         const topSimilarity = Math.max(...placeMatches.map((r: { similarity: number }) => r.similarity || 0));
         return {
           ...place,
+          reviews: (place.reviews || []).filter((r: { status: string }) => r.status === 'approved'),
           relevanceScore: topSimilarity,
           matchedReviews: placeMatches,
         };
@@ -104,7 +105,7 @@ async function runKeywordSearch(supabase: ReturnType<typeof getServiceRoleClient
 
   const { data: places, error } = await supabase
     .from('places')
-    .select('*')
+    .select('*, reviews(id, author_name, rating, content, must_try_dishes, price_paid, status, created_at)')
     .or(`name.ilike.${pattern},description.ilike.${pattern},address.ilike.${pattern},summary.ilike.${pattern}`)
     .limit(20);
 
@@ -113,7 +114,10 @@ async function runKeywordSearch(supabase: ReturnType<typeof getServiceRoleClient
     return NextResponse.json({ error: 'Search failed' }, { status: 500 });
   }
 
-  const results = places || [];
+  const results = (places || []).map((p) => ({
+    ...p,
+    reviews: (p.reviews || []).filter((r: { status: string }) => r.status === 'approved'),
+  }));
   await logSearchQuery({ query, searchType: 'keyword', resultsCount: results.length });
 
   return NextResponse.json({

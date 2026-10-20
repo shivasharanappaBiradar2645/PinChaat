@@ -11,9 +11,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DynamicMapPinPicker } from '@/components/map/DynamicMap';
-import { CheckCircle, AlertCircle } from 'lucide-react';
+import { CheckCircle, AlertCircle, Clock, MapPin } from 'lucide-react';
 
 interface SuggestPlaceModalProps {
   isOpen: boolean;
@@ -33,6 +32,7 @@ export default function SuggestPlaceModal({ isOpen, onClose }: SuggestPlaceModal
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isResolvingUrl, setIsResolvingUrl] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [isSubmittedSuccessfully, setIsSubmittedSuccessfully] = useState(false);
 
   const handleResolveMapsUrl = async (urlToResolve: string) => {
     if (!urlToResolve.trim()) return;
@@ -88,21 +88,7 @@ export default function SuggestPlaceModal({ isOpen, onClose }: SuggestPlaceModal
         throw new Error(data.error || 'Failed to submit place suggestion');
       }
 
-      setStatusMessage({
-        type: 'success',
-        text: 'Foodie spot suggested! The admin will review and add it to the map.',
-      });
-
-      setName('');
-      setAddress('');
-      setReason('');
-      setTags('');
-      setGoogleMapsUrl('');
-
-      setTimeout(() => {
-        onClose();
-        setStatusMessage(null);
-      }, 2000);
+      setIsSubmittedSuccessfully(true);
     } catch (err: unknown) {
       setStatusMessage({
         type: 'error',
@@ -113,169 +99,221 @@ export default function SuggestPlaceModal({ isOpen, onClose }: SuggestPlaceModal
     }
   };
 
+  const handleClose = () => {
+    setName('');
+    setAddress('');
+    setReason('');
+    setTags('');
+    setGoogleMapsUrl('');
+    setIsSubmittedSuccessfully(false);
+    setStatusMessage(null);
+    onClose();
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent className="sm:max-w-[560px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-lg">Suggest a Hidden Gem</DialogTitle>
-          <DialogDescription className="text-xs">
-            Found an unlisted street food stall, tea stall, or cafe? Drop a pin to suggest it.
-          </DialogDescription>
-        </DialogHeader>
+        {isSubmittedSuccessfully ? (
+          <div className="flex flex-col items-center justify-center p-4 py-8 text-center gap-4">
+            <div className="size-14 rounded-full bg-green-100 dark:bg-green-950 flex items-center justify-center text-green-600">
+              <CheckCircle className="size-8" />
+            </div>
 
-        {statusMessage && (
-          <div
-            className={`p-3 rounded-lg text-xs flex items-center gap-2 ${
-              statusMessage.type === 'success'
-                ? 'bg-green-50 text-green-800 border border-green-200 dark:bg-green-950/30 dark:text-green-300'
-                : 'bg-red-50 text-red-800 border border-red-200 dark:bg-red-950/30 dark:text-red-300'
-            }`}
-          >
-            {statusMessage.type === 'success' ? (
-              <CheckCircle className="size-4 shrink-0 text-green-600" />
-            ) : (
-              <AlertCircle className="size-4 shrink-0 text-red-600" />
-            )}
-            <span>{statusMessage.text}</span>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3.5 mt-2">
-          {/* Map Pin Dropper */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold text-foreground">1. Pin Location on Map</label>
-            <DynamicMapPinPicker
-              initialLat={latitude}
-              initialLng={longitude}
-              onPickCoordinates={(lat, lng, suggestedAddress) => {
-                setLatitude(lat);
-                setLongitude(lng);
-                if (suggestedAddress && !address) {
-                  setAddress(suggestedAddress);
-                }
-              }}
-            />
-          </div>
-
-          {/* Place Name */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold text-foreground">
-              Place / Stall Name <span className="text-red-500">*</span>
-            </label>
-            <Input
-              required
-              placeholder="e.g. Raju Chaat Bhandar or Corner Tea stall"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="text-xs h-9"
-            />
-          </div>
-
-          {/* Address */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold text-foreground">Address / Landmark</label>
-            <Input
-              placeholder="e.g. Near Metro Pillar 140, Karol Bagh"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              className="text-xs h-9"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            {/* Price Level */}
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-foreground">Price Level</label>
-              <Select
-                value={priceLevel}
-                onValueChange={(val) => {
-                  if (val) setPriceLevel(val as 'budget' | 'moderate' | 'expensive');
-                }}
-              >
-                <SelectTrigger className="text-xs h-9">
-                  <SelectValue placeholder="Select price level" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="budget">₹ Budget (under ₹150)</SelectItem>
-                  <SelectItem value="moderate">₹₹ Moderate (₹150 - ₹500)</SelectItem>
-                  <SelectItem value="expensive">₹₹₹ Splurge (₹500+)</SelectItem>
-                </SelectContent>
-              </Select>
+              <h3 className="font-extrabold text-lg text-foreground">Spot Submitted for Review!</h3>
+              <p className="text-xs text-muted-foreground">
+                Thank you for contributing to the PinChaat community.
+              </p>
             </div>
 
-            {/* Tags */}
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-foreground">Tags (comma separated)</label>
-              <Input
-                placeholder="e.g. chaat, pani puri, evening"
-                value={tags}
-                onChange={(e) => setTags(e.target.value)}
-                className="text-xs h-9"
-              />
+            <div className="p-3.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2.5 text-left max-w-md">
+              <Clock className="size-5 shrink-0 text-amber-600 mt-0.5" />
+              <div className="flex flex-col gap-1">
+                <span className="font-semibold text-xs text-amber-900 dark:text-amber-100">
+                  Moderation Required
+                </span>
+                <span className="text-[11px] leading-relaxed text-amber-800 dark:text-amber-300">
+                  To prevent spam and keep reviews 100% genuine, all suggested spots are held in the moderation queue. The admin will verify and approve <strong>{name}</strong> before it appears publicly on the map.
+                </span>
+              </div>
             </div>
-          </div>
 
-          {/* Google Maps link with auto-coordinate detection */}
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-semibold text-foreground">Google Maps URL</label>
-              {googleMapsUrl && (
-                <button
-                  type="button"
-                  onClick={() => handleResolveMapsUrl(googleMapsUrl)}
-                  disabled={isResolvingUrl}
-                  className="text-[11px] text-orange-600 dark:text-orange-400 hover:underline font-medium"
-                >
-                  {isResolvingUrl ? 'Detecting coordinates...' : '⚡ Extract Pin Coordinates'}
-                </button>
-              )}
-            </div>
-            <Input
-              placeholder="Paste Google Maps link (e.g. https://maps.app.goo.gl/...)"
-              value={googleMapsUrl}
-              onChange={(e) => {
-                const val = e.target.value;
-                setGoogleMapsUrl(val);
-                if (val.includes('maps.google.') || val.includes('goo.gl') || val.includes('google.com/maps')) {
-                  handleResolveMapsUrl(val);
-                }
-              }}
-              onBlur={() => {
-                if (googleMapsUrl.trim()) handleResolveMapsUrl(googleMapsUrl);
-              }}
-              className="text-xs h-9"
-            />
-            <span className="text-[10px] text-muted-foreground">
-              Pasting a Google Maps link will automatically extract latitude & longitude and place the pin.
-            </span>
-          </div>
-
-          {/* Why Recommend */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold text-foreground">Why do you recommend this spot?</label>
-            <Textarea
-              rows={2}
-              placeholder="Signature dish, specialty chutney, best time to visit..."
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              className="text-xs"
-            />
-          </div>
-
-          <div className="flex justify-end gap-2 mt-2 pt-2 border-t">
-            <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={isSubmitting}>
-              Cancel
-            </Button>
             <Button
-              type="submit"
-              size="sm"
-              disabled={isSubmitting || !name.trim()}
-              className="bg-orange-600 hover:bg-orange-700 text-white"
+              type="button"
+              onClick={handleClose}
+              className="mt-2 text-xs bg-orange-600 hover:bg-orange-700 text-white px-6"
             >
-              {isSubmitting ? 'Submitting...' : 'Submit Suggestion'}
+              Got it, thanks!
             </Button>
           </div>
-        </form>
+        ) : (
+          <>
+            <DialogHeader>
+              <DialogTitle className="text-lg">Suggest a Hidden Gem</DialogTitle>
+              <DialogDescription className="text-xs">
+                Found an unlisted street food stall, tea stall, or cafe? Suggest it so other foodies can discover it.
+              </DialogDescription>
+            </DialogHeader>
+
+            {statusMessage && (
+              <div
+                className={`p-3 rounded-lg text-xs flex items-center gap-2 ${
+                  statusMessage.type === 'success'
+                    ? 'bg-green-50 text-green-800 border border-green-200 dark:bg-green-950/30 dark:text-green-300'
+                    : 'bg-red-50 text-red-800 border border-red-200 dark:bg-red-950/30 dark:text-red-300'
+                }`}
+              >
+                {statusMessage.type === 'success' ? (
+                  <CheckCircle className="size-4 shrink-0 text-green-600" />
+                ) : (
+                  <AlertCircle className="size-4 shrink-0 text-red-600" />
+                )}
+                <span>{statusMessage.text}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="flex flex-col gap-3.5 mt-2">
+              {/* Google Maps link with auto-coordinate detection */}
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-foreground">Google Maps URL (Recommended)</label>
+                  {googleMapsUrl && (
+                    <button
+                      type="button"
+                      onClick={() => handleResolveMapsUrl(googleMapsUrl)}
+                      disabled={isResolvingUrl}
+                      className="text-[11px] text-orange-600 dark:text-orange-400 hover:underline font-medium"
+                    >
+                      {isResolvingUrl ? 'Detecting coordinates...' : '⚡ Extract Pin Coordinates'}
+                    </button>
+                  )}
+                </div>
+                <Input
+                  placeholder="Paste Google Maps link (e.g. https://maps.app.goo.gl/...)"
+                  value={googleMapsUrl}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setGoogleMapsUrl(val);
+                    if (val.includes('maps.google.') || val.includes('goo.gl') || val.includes('google.com/maps')) {
+                      handleResolveMapsUrl(val);
+                    }
+                  }}
+                  onBlur={() => {
+                    if (googleMapsUrl.trim()) handleResolveMapsUrl(googleMapsUrl);
+                  }}
+                  className="text-xs h-9"
+                />
+                <span className="text-[10px] text-muted-foreground">
+                  Pasting a link will auto-extract latitude & longitude and set the map pin.
+                </span>
+              </div>
+
+              {/* Map Pin Dropper */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-foreground">Or Click to Adjust Pin on Map</label>
+                <DynamicMapPinPicker
+                  initialLat={latitude}
+                  initialLng={longitude}
+                  onPickCoordinates={(lat, lng, suggestedAddress) => {
+                    setLatitude(lat);
+                    setLongitude(lng);
+                    if (suggestedAddress && !address) {
+                      setAddress(suggestedAddress);
+                    }
+                  }}
+                />
+              </div>
+
+              {/* Place Name */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-foreground">
+                  Place / Stall Name <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  required
+                  placeholder="e.g. Raju Chaat Bhandar or Corner Tea stall"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="text-xs h-9"
+                />
+              </div>
+
+              {/* Address */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-foreground">Address / Landmark</label>
+                <Input
+                  placeholder="e.g. Near Metro Pillar 140, Karol Bagh"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  className="text-xs h-9"
+                />
+              </div>
+
+              {/* Clean Touch-Friendly Budget Selector */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-foreground">Budget / Price Level</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: 'budget', label: '₹ Budget', sub: '< ₹150' },
+                    { id: 'moderate', label: '₹₹ Moderate', sub: '₹150 - ₹500' },
+                    { id: 'expensive', label: '₹₹₹ Splurge', sub: '₹500+' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setPriceLevel(opt.id as 'budget' | 'moderate' | 'expensive')}
+                      className={`p-2 rounded-lg border text-left flex flex-col transition-all cursor-pointer ${
+                        priceLevel === opt.id
+                          ? 'border-orange-500 bg-orange-50 text-orange-950 dark:bg-orange-950/40 dark:text-orange-200 ring-1 ring-orange-500'
+                          : 'border-border bg-card hover:bg-muted text-muted-foreground'
+                      }`}
+                    >
+                      <span className="font-semibold text-xs text-foreground">{opt.label}</span>
+                      <span className="text-[10px] text-muted-foreground">{opt.sub}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Tags */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-foreground">Food Tags (comma separated)</label>
+                <Input
+                  placeholder="e.g. wadapav, misalpav, chai, evening snacks"
+                  value={tags}
+                  onChange={(e) => setTags(e.target.value)}
+                  className="text-xs h-9"
+                />
+              </div>
+
+              {/* Why Recommend */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-foreground">What makes this spot special? (Description)</label>
+                <Textarea
+                  rows={2}
+                  placeholder="Signature dish, specialty chutney, best time to visit, prices..."
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  className="text-xs"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 mt-2 pt-2 border-t">
+                <Button type="button" variant="outline" size="sm" onClick={handleClose} disabled={isSubmitting}>
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={isSubmitting || !name.trim()}
+                  className="bg-orange-600 hover:bg-orange-700 text-white text-xs"
+                >
+                  {isSubmitting ? 'Submitting...' : 'Submit Spot for Approval'}
+                </Button>
+              </div>
+            </form>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );

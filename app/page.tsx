@@ -352,12 +352,42 @@ export default function HomePage() {
                 <DrawerDescription className="text-xs">{selectedPlace.address || 'Street Location'}</DrawerDescription>
               </DrawerHeader>
 
+              {/* Spot Description */}
+              {selectedPlace.description && (
+                <p className="text-xs text-foreground/80 leading-relaxed font-normal">
+                  {selectedPlace.description}
+                </p>
+              )}
+
               {selectedPlace.summary && (
                 <div className="p-2.5 rounded-lg bg-orange-50 dark:bg-orange-950/20 border border-orange-100 text-xs">
                   <div className="flex items-center gap-1 font-semibold text-orange-700 dark:text-orange-400 mb-0.5 text-[11px]">
                     <Sparkles className="size-3" /> Community Foodie Summary
                   </div>
                   {selectedPlace.summary}
+                </div>
+              )}
+
+              {/* Patron Reviews in Drawer */}
+              {selectedPlace.reviews && selectedPlace.reviews.length > 0 && (
+                <div className="flex flex-col gap-2 max-h-48 overflow-y-auto">
+                  <span className="text-xs font-bold text-foreground">
+                    Patron Reviews ({selectedPlace.reviews.length})
+                  </span>
+                  {selectedPlace.reviews.map((r) => (
+                    <div key={r.id} className="p-2 rounded-lg bg-muted/50 border border-border/60 text-xs flex flex-col gap-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-foreground">{r.author_name || 'Anonymous'}</span>
+                        <span className="text-amber-500 font-bold">{r.rating} ★</span>
+                      </div>
+                      <p className="italic text-foreground/80 leading-relaxed">"{r.content}"</p>
+                      {r.must_try_dishes && r.must_try_dishes.length > 0 && (
+                        <span className="text-[10px] text-muted-foreground">
+                          Picks: {r.must_try_dishes.join(', ')}
+                        </span>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
 
