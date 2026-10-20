@@ -3,22 +3,35 @@ import { getServiceRoleClient } from '@/lib/supabase/server';
 import { generatePlaceProfile, FLASH_MODEL } from '@/lib/gemini';
 
 export async function GET(request: NextRequest) {
-  // 1. Verify Vercel Cron Secret or Bearer Token
+  // 1. Verify Vercel Cron Secret, Bearer Token, or Admin Access Token
   const authHeader = request.headers.get('authorization');
   const cronSecretHeader = request.headers.get('x-cron-secret');
+  const adminTokenHeader = request.headers.get('x-admin-token');
   const expectedSecret = process.env.CRON_SECRET || 'cron-secret-123';
+  const expectedAdminToken = process.env.ADMIN_ACCESS_TOKEN || 'admin123';
 
-  const token = authHeader?.replace('Bearer ', '') || cronSecretHeader;
-  if (!token || token !== expectedSecret) {
-    return NextResponse.json({ error: 'Unauthorized cron trigger' }, { status: 401 });
+  const token = authHeader?.replace('Bearer ', '') || cronSecretHeader || adminTokenHeader;
+  const isAuthorized = !!token && (token === expectedSecret || token === expectedAdminToken);
+
+  if (!isAuthorized) {
+    return NextResponse.json({ error: 'Unauthorized trigger' }, { status: 401 });
   }
 
   const supabase = getServiceRoleClient();
-  const summaryReport: Array<{ placeId: string; placeName: string; version: number; status: string }> = [];
+  const summaryReport: Array<{
+    placeId: string;
+    placeName: string;
+    version: number;
+    categories: string[];
+    tags: string[];
+    status: string;
+  }> = [];
 
   try {
-    // 2. Fetch all places
-    const { data: places, error: placesErr } = await supabase.from('places').select('id, name');
+    // 2. Fetch all places with their current description and tags
+    const { data: places, error: placesErr } = await supabase
+      .from('places')
+      .select('id, name, description, tags, average_cost_per_person');
     if (placesErr) throw placesErr;
 
     for (const place of places || []) {
@@ -30,8 +43,9 @@ export async function GET(request: NextRequest) {
         .eq('status', 'approved')
         .limit(20);
 
-      if (revErr || !reviews || reviews.length === 0) {
-        continue; // Skip spots with no approved reviews yet
+      // Skip spots that have neither reviews nor a description/tags to analyze
+      if ((!reviews || reviews.length === 0) && !place.description && (!place.tags || place.tags.length === 0)) {
+        continue;
       }
 
       // Find current latest version
@@ -45,8 +59,17 @@ export async function GET(request: NextRequest) {
 
       const nextVersion = (latestProfile?.version || 0) + 1;
 
-      // 3. Generate structured AI profile using gemini-2.0-flash with untrusted data isolation
-      const profileData = await generatePlaceProfile(place.name, reviews);
+      // 3. Generate structured AI profile & fix spelling/taxonomy using gemini-2.0-flash
+      const profileData = await generatePlaceProfile(
+        place.name,
+        reviews || [],
+        { description: place.description, tags: place.tags }
+      );
+
+      // Merge canonical categories and normalized tags into clean, unique tags (removes typos & aligns UI filters)
+      const cleanMergedTags = Array.from(
+        new Set([...profileData.canonical_categories, ...profileData.normalized_tags])
+      );
 
       // 4. Strictly write to allowlisted columns on place_profiles
       const { data: newProfile, error: profileInsertErr } = await supabase
@@ -59,7 +82,7 @@ export async function GET(request: NextRequest) {
           price_range_min: profileData.price_range_min,
           price_range_max: profileData.price_range_max,
           vibe_tags: profileData.vibe_tags,
-          review_count_sampled: reviews.length,
+          review_count_sampled: reviews?.length || 0,
           model_used: FLASH_MODEL,
         })
         .select('id')
@@ -70,11 +93,15 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
-      // Update places with the refreshed rolling summary & profile pointer
+      // Update places with the refreshed rolling summary, normalized tags, and average cost
+      const estimatedCost = place.average_cost_per_person || Math.round((profileData.price_range_min + profileData.price_range_max) / 2);
+
       await supabase
         .from('places')
         .update({
           summary: profileData.summary,
+          tags: cleanMergedTags,
+          average_cost_per_person: estimatedCost,
           latest_profile_id: newProfile.id,
           updated_at: new Date().toISOString(),
         })
@@ -84,7 +111,9 @@ export async function GET(request: NextRequest) {
         placeId: place.id,
         placeName: place.name,
         version: nextVersion,
-        status: 'updated',
+        categories: profileData.canonical_categories,
+        tags: cleanMergedTags,
+        status: 'categorized_and_summarized',
       });
     }
 

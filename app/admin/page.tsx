@@ -64,6 +64,27 @@ export default function AdminPage() {
   const [newDescription, setNewDescription] = useState('');
   const [addPlaceStatus, setAddPlaceStatus] = useState<string | null>(null);
   const [isResolvingAdminUrl, setIsResolvingAdminUrl] = useState(false);
+  const [isCronRunning, setIsCronRunning] = useState(false);
+  const [cronResultStatus, setCronResultStatus] = useState<string | null>(null);
+
+  const handleTriggerAiCategorizer = async () => {
+    setIsCronRunning(true);
+    setCronResultStatus(null);
+    try {
+      const res = await fetch('/api/cron/weekly-summary', {
+        headers: { 'x-admin-token': adminToken },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to run AI categorizer');
+
+      setCronResultStatus(`Successfully analyzed & categorized ${data.summarizedCount} spots! Cleaned up typos and aligned category filters.`);
+      setTimeout(() => setCronResultStatus(null), 8000);
+    } catch (err: unknown) {
+      setCronResultStatus((err as Error).message || 'Failed to run AI categorizer');
+    } finally {
+      setIsCronRunning(false);
+    }
+  };
 
   const handleResolveAdminMapsUrl = async (url: string) => {
     if (!url.trim()) return;
@@ -107,6 +128,9 @@ export default function AdminPage() {
         setAnalytics(data);
         setAdminToken(tokenInput.trim());
         setIsAuthenticated(true);
+        try {
+          localStorage.setItem('pinchaat_admin_token', tokenInput.trim());
+        } catch (_) {}
         loadModerationQueues(tokenInput.trim());
       })
       .catch(() => {
@@ -366,6 +390,45 @@ export default function AdminPage() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* AI Taxonomy & Spelling Categorizer Card */}
+            <Card className="border-orange-200 dark:border-orange-900 bg-orange-50/40 dark:bg-orange-950/15">
+              <CardContent className="p-4 flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex-1 min-w-[260px]">
+                  <div className="flex items-center gap-1.5 font-bold text-sm text-foreground mb-1">
+                    <Sparkles className="size-4 text-orange-600" />
+                    AI Auto-Categorizer & Taxonomy Alignment
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Automatically scans all spots, fixes typos in food tags (e.g. <em>"wadapav" → "vada pav"</em>), maps spots into standard categories (<em>street food, thali, chaat</em>), and updates rolling summaries.
+                  </p>
+                  {cronResultStatus && (
+                    <p className="text-xs font-semibold text-green-700 dark:text-green-400 mt-2">
+                      {cronResultStatus}
+                    </p>
+                  )}
+                </div>
+
+                <Button
+                  size="sm"
+                  onClick={handleTriggerAiCategorizer}
+                  disabled={isCronRunning}
+                  className="bg-orange-600 hover:bg-orange-700 text-white text-xs gap-1.5 shrink-0"
+                >
+                  {isCronRunning ? (
+                    <>
+                      <Loader2 className="size-3.5 animate-spin" />
+                      Analyzing & Normalizing...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="size-3.5" />
+                      Run AI Categorizer Now
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
 
             {/* Cravings Intelligence & Zero Result Alert */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
