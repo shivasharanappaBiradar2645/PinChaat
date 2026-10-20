@@ -2,7 +2,7 @@ import { GoogleGenAI } from '@google/genai';
 import { checkGlobalGeminiDailyCap } from './rate-limit';
 
 export const EMBEDDING_MODEL = 'gemini-embedding-2';
-export const FLASH_MODEL = 'gemini-2.0-flash';
+export const FLASH_MODEL = 'gemini-3.1-flash-lite';
 export const EMBEDDING_DIMENSION = 768;
 
 function getGeminiClient(): GoogleGenAI {
